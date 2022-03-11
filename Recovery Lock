@@ -1,0 +1,124 @@
+#!/bin/bash
+
+
+###### BASE URL OF JSS ##########################
+jurl=""
+###### Will be prompted later ####
+username=""
+password=""
+### echo "user:pass" | base64 ***** 
+userpass64=""
+####### RECOMMENDED TO USE A SHARED PATH #########
+jsonpath=""
+csvpath=""
+pspath=""
+######### FOR YOUR RESULTS THAT WILL BE RETURNED ########
+numberofcomputers=""
+#################################################
+
+# Check for input on variables, prompt if empty
+#
+# Empty Username
+if [ -z ${username} ]; then
+	echo "Please enter your Jamf Pro username: "
+	read $username
+fi
+
+# Empty Password
+if [ -z ${password} ]; then
+	echo "Please enter your Jamf Pro password: "
+	read -s $password
+fi
+
+# Empty jssURL
+if [ -z ${jurl} ]; then
+	echo "Please enter your Jamf Pro URL: "
+	echo "(ex. https://server.jamfcloud.com)"
+	read $jurl
+fi
+
+
+credentials=$(curl -s -X POST "$jurl/api/v1/auth/token" -H "accept: application/json" -H "Authorization: Basic '$userpass64'" | awk  '/token/{print $NF}' | tr -d \",)
+
+echo $credentials
+
+classicCredentials=$(printf "${username}:${password}" | /usr/bin/iconv -t ISO-8859-1 | /usr/bin/base64 -i - )
+echo $classicCredentials
+
+# generate an auth token
+authToken=$( /usr/bin/curl "${jurl}/uapi/auth/tokens" \
+--silent \
+--request POST \
+--header "Authorization: Basic ${classicCredentials}" )
+
+#create token for authorization on classic API
+token=$( /usr/bin/awk -F \" '{ print $4 }' <<< "$authToken" | /usr/bin/xargs )
+
+
+curl -X GET -s "$jurl/api/preview/computers?page=0&size=100&pagesize=100&page-size=100&sort=name%3Aasc" -H "accept: application/json" -H "Authorization: Bearer $credentials" > $jsonpath
+
+cat << EOF > "$pspath"
+import json
+with open ('$jsonpath') as json_file:
+				data = json.load(json_file)
+				for x in range($numberofcomputers):
+					print("" + data["results"][x]['serialNumber'] + ("," + data["results"][x]['managementId']))
+
+EOF
+
+python3 "$pspath" > $csvpath
+
+prompt=$(/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper\
+				-windowType hud\
+				-description "Would you like to import a Smart / Static Group?"\
+				-button1 "Yes"\
+				-button2 "No"\
+				-defaultButton 1)
+echo $prompt
+
+if [[ $prompt -eq "0" ]]; then
+	smartgroupselection=$(osascript << EOF 
+set smartgroup to display dialog "Enter Smart Group ID" default answer "" with icon note buttons {"Cancel", "Continue"} default button "Continue"
+text returned of smartgroup
+EOF
+)
+	serialsreturned+=($(curl -s -X GET "$jurl/JSSResource/computergroups/id/$smartgroupselection" -H "accept: application/xml" -H "Authorization: Bearer $token" | xmllint --format - | awk -F'>|<' '/<serial_number>/{print $3","}' | sort -n ))
+	
+	echo ${serialsreturned[@]}
+	
+IFS=","
+for result in ${serialsreturned[@]}; do
+	managementid+=($(awk -F, -v serial="$result" '$1 == serial { print $2; exit }' $csvpath))
+done
+
+elif [[ $prompt -eq "2" ]]; then
+
+serialsearch=$(osascript << EOF 
+set Serial to display dialog "Serial Number" default answer "" with icon note buttons {"Cancel", "Continue"} default button "Continue"
+text returned of Serial
+EOF
+)
+	
+	if [[ -z $serialsearch ]]; then
+		exit 0
+	fi
+
+IFS=","
+for result in $serialsearch; do
+	managementid+=($(awk -F, -v serial="$result" '$1 == serial { print $2; exit }' $csvpath))
+done
+	
+else
+	exit 0
+
+fi
+
+rlpass=$(osascript << EOF
+set theResponse to display dialog "You are setting a Recovery Lock Password (Note: this will only work on M1 machines)" default answer "" with icon note buttons {"Cancel", "Continue"} default button "Continue"
+text returned of theResponse
+EOF
+)
+
+for managementid in ${managementid[@]}; do
+	curl -X POST "https://chrisjamfpro.jamfcloud.com/api/preview/mdm/commands" -H "accept: application/json" -H "Authorization: Bearer $credentials" -H "Content-Type: application/json" -d "{\"clientData\":[{\"managementId\":\"$managementid\",\"clientType\":\"COMPUTER\"}],\"commandData\":{\"commandType\":\"SET_RECOVERY_LOCK\",\"newPassword\":\"$rlpass\"}}"
+	done
