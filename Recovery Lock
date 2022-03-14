@@ -40,10 +40,8 @@ fi
 
 credentials=$(curl -s -X POST "$jurl/api/v1/auth/token" -H "accept: application/json" -H "Authorization: Basic '$userpass64'" | awk  '/token/{print $NF}' | tr -d \",)
 
-echo $credentials
-
 classicCredentials=$(printf "${username}:${password}" | /usr/bin/iconv -t ISO-8859-1 | /usr/bin/base64 -i - )
-echo $classicCredentials
+
 
 # generate an auth token
 authToken=$( /usr/bin/curl "${jurl}/uapi/auth/tokens" \
