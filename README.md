@@ -28,19 +28,19 @@ You can customize some things in this script to get your CSV to pull the informa
 The idea is you print a CSV file that can be edited with the correct smart groups in every class. 
 
 Once the CSV is printed you should get a document that looks like this: 
-
+```
 classid,roster_location 
 classid,roster_location
 classid,roster_location
 classid,roster_location
-
+```
 To get the CSV prepped for the second script you will need to have it look something like this:
-
+```
 classid,roster_location,12 25 13 2 
 classid,roster_location,19 30 10 29
 classid,roster_location,17 23 26 24
 classid,roster_location,20 29 13 6
-
+```
 Where the integers are the smart group ids found in the Jamf Pro URL. PLEASE NOTE, these ids are separated by a space, if you do not have these ids separated by a space then the next script will fail. Also note, you can use the same smart group for multiple classes. 
 
 ### Part 2 
