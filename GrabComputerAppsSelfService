@@ -1,0 +1,133 @@
+#!/bin/bash
+
+##### Script Paramenters (Entered in Jamf Pro) ########
+#
+# Paramenter 4: Jamf Url (https://instancename.jamfcloud.com)
+# Paramenter 5: Base64 Credentials for API User (echo user:pass | base64) 
+#   (API User Permissions: Jamf Pro Server Objects > Computers > Read)
+# Paramenter 6: CSV File Path (/Users/Shared/filename.csv)
+# Paramenter 7: Email to send the application information
+#
+# Created by Chris Zimmerman on 4-27-2022
+# 
+# This script was made as a practice. Any feedback is welcome. When using this script you are accepting that you are using it "as-is". 
+#
+#######################################################
+jurl="$4"
+userpass64="$5"
+### Filepath should be /Users/Shared/filename.csv 
+### Feel free to use whatever for filename but must end with .csv
+csvpath="$6"
+email="$7"
+################# Get Bearer Token ##################
+
+decode=$(echo $userpass64 | base64 -d)
+
+classicCredentials=$(printf "$decode" | /usr/bin/iconv -t ISO-8859-1 | /usr/bin/base64 -i - )
+
+# generate an auth token
+authToken=$( /usr/bin/curl "https://chrisjamfpro.jamfcloud.com/uapi/auth/tokens" \
+--silent \
+--request POST \
+--header "Authorization: Basic ${classicCredentials}" )
+
+token=$( /usr/bin/awk -F \" '{ print $4 }' <<< "$authToken" | /usr/bin/xargs )
+
+######### Prompt for Computer Name ##################
+computername=$(osascript << EOF
+set computername to display dialog "Enter Computer Name" default answer "" buttons {"Continue"} default button "Continue"
+text returned of computername
+EOF
+)
+##########################################################################
+########### Verify Computer Name and get ID for computer record ##########
+checkcomputername=$(curl -s $jurl/JSSResource/computers/match/$computername -H "accept: application/xml" -H "Authorization: Bearer $token" | xmllint --xpath '/computers/size/text()' -)
+
+#### This double checks the computer name works, if not use serial number ###
+if [[ $checkcomputername -eq "1" ]]; then
+	getid=$(curl -s $jurl/JSSResource/computers/match/$computername -H "accept: application/xml" -H "Authorization: Bearer $token" | xmllint --xpath "/computers/computer/id/text()" -)
+else
+	promptforsn=$(osascript << EOF
+set computername to display dialog "Your Computer Name either returned too many or no results, please search by serial number instead" default answer "" buttons {"Continue"} default button "Continue"
+text returned of computername
+EOF
+)
+	getid=$(curl -s $jurl/JSSResource/computers/serialnumber/$promptforsn -H "accept: application/xml" -H "Authorization: Bearer $token" | xmllint --xpath "/computer/general/id/text()" -)
+fi
+
+if [[ ! -z $getid ]]; then
+	####### computer record for the XSLT document ##########
+	computerrecord=$(curl -s -H "accept: text/xml" $jurl/JSSResource/computers/id/$getid -H "Authorization: Bearer $token")
+else
+	errorprompt=$(osascript << EOF
+set theDialogText to "There was an error processing your request"
+display dialog theDialogText
+EOF
+)
+	exit 1
+	fi
+
+######################################
+# Secret Sauce to create CSV #
+# Create an XSLT file at /tmp/stylesheet.xslt
+#######################################
+cat << EOF > /tmp/computerrecord.xslt
+<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+<xsl:output method="text"/>
+<xsl:template match="/"> 
+<xsl:text> Computer Name: </xsl:text> 
+<xsl:value-of select="computer/general/name"/> 
+<xsl:text>&#xa;</xsl:text>
+<xsl:text> Installed Applications</xsl:text>
+<xsl:text>:</xsl:text> 
+<xsl:for-each select="computer/software/applications/application"> 
+	<xsl:text>,</xsl:text>
+	<xsl:value-of select="name"/> 
+	<xsl:text>&#xa;</xsl:text> 
+</xsl:for-each> 
+</xsl:template> 
+</xsl:stylesheet>
+EOF
+
+echo "$computerrecord" | xsltproc /tmp/computerrecord.xslt - > $csvpath
+
+############## Email CSV Record #################
+# convert file to applescript format #
+filepath=$(echo $csvpath | tr / ":" | sed -e 's/^/Macintosh HD/')
+
+####### Begin AppleScript Magic #############
+
+osascript << EOF
+tell application "Finder"
+	set theFile to file "$filepath" as alias
+	set fileName to name of theFile
+end tell
+set theSubject to "Applications for $computername on " & (current date)
+set theBody to "Here is your application record for $computername with file:" & fileName
+set theAddress to "$email"
+set theAttachment to theFile
+set theSender to "Name of Sender"
+tell application "Mail"
+	set theNewMessage to make new outgoing message with properties {subject:theSubject, content:theBody & return & return, visible:true}
+	tell theNewMessage
+		set visibile to true
+		set sender to theSender
+		make new to recipient at end of to recipients with properties {address:theAddress}
+	end tell
+	tell content of theNewMessage
+		try
+			make new attachment with properties {file name:theFile} at after the last word of the last paragraph
+			set message_attachment to 0
+		on error errmess -- oops
+			log errmess -- log the error
+			set message_attachment to 1
+		end try
+		log "message_attachment = " & message_attachment
+	end tell
+	delay 10
+	tell theNewMessage
+		send
+	end tell
+end tell
+EOF
