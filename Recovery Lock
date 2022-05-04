@@ -1,6 +1,17 @@
 #!/bin/bash
 
-
+########### RECOVERY LOCK SCRIPT (M1) ###########
+# This Script allows you to select a smart group,
+# static group, or a list of serial numbers. It
+# first starts by getting a list of serials and 
+# the corresponding management ids. (Which the 
+# number of computers will pull and make a CSV 
+# document.) {Python needed} 
+#
+#
+# Created by Chris Zimmerman 3-22-22 
+# 
+# By using this script you agree to using it "as -is".
 ###### BASE URL OF JSS ##########################
 jurl=""
 ###### Will be prompted later ####
