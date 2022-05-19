@@ -2,11 +2,11 @@
 
 ##### Script Paramenters (Entered in Jamf Pro) ########
 #
-# Paramenter 4: Jamf Url (https://instancename.jamfcloud.com)
-# Paramenter 5: Base64 Credentials for API User (echo user:pass | base64) 
+# Parameter 4: Jamf Url (https://instancename.jamfcloud.com)
+# Parameter 5: Base64 Credentials for API User (echo user:pass | base64) 
 #   (API User Permissions: Jamf Pro Server Objects > Computers > Read)
-# Paramenter 6: CSV File Path (/Users/Shared/filename.csv)
-# Paramenter 7: Email to send the application information
+# Parameter 6: CSV File Path (/Users/Shared/filename.csv)
+# Parameter 7: Email to send the application information
 #
 # Created by Chris Zimmerman on 4-27-2022
 # 
