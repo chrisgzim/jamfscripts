@@ -58,3 +58,13 @@ This script will run for ALL Entries in your CSV file. So if you don't want to d
 - Create a Script that allows admins to set a range for class ids to run the command on. (So the CSV doesn't need to be edited) 
 - Find a workflow that allows for this whole script to be automated (would involve naming conventions and the sort) 
 - Just have a prompt for the class and allow for a one at a time approach to avoid having to edit a CSV document. 
+
+## Erase or Lock Computer
+
+This is a script I made that has a ton of prompts on it. The goal is to help do a mass action for Remote Wipe and Device Lock commands. So please use at your own risk. 
+
+This is pretty straight forward. The script will default to only device lock unless the varible for '''eraseorlock''' is set to '''1'''. 
+
+The prompts are there if you aren't comfortable leaving your credentials in the script. 
+
+There are probably better ways to do this, but it was a fun proposal by one of my coworkers and I wanted to give it a shot! 
