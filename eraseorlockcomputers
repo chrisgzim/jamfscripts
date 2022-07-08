@@ -94,8 +94,20 @@ else
 	command="DeviceLock"
 fi
 
+#Start of getting Bearer Token
+classicCredentials=$(printf "${user}:${pass}" | /usr/bin/iconv -t ISO-8859-1 | /usr/bin/base64 -i - )
+
+# generate an auth token
+authToken=$( /usr/bin/curl "${jurl}/uapi/auth/tokens" \
+--silent \
+--request POST \
+--header "Authorization: Basic ${classicCredentials}" )
+
+#bearertoken
+token=$( /usr/bin/awk -F \" '{ print $4 }' <<< "$authToken" | /usr/bin/xargs )
+
 #Parse Through Group to get computer IDs
-computerid+=($(curl -ksu $user:$pass -X GET $jurl/JSSResource/computergroups/id/$groupid | xmllint --format - | awk -F '[<>]' '/<id>/{print $3}'| awk 'NR>2'))
+computerid+=($(curl -s -X GET $jurl/JSSResource/computergroups/id/$groupid -H "Authorization: Bearer $token" | xmllint --format - | awk -F '[<>]' '/<id>/{print $3}'| awk 'NR>2'))
 
 echo ${computerid[@]}
 
@@ -158,7 +170,7 @@ if [[ $finalwarning == "button returned:"Continue"" ]]; then
 	
 	#Erase or Lock Device Command	
 	for id in ${computerid[@]}; do
-		curl -ksu $user:$pass -X POST $jurl/JSSResource/computercommands/command/$command/passcode/$passcode/id/$id
+		curl -s -X POST $jurl/JSSResource/computercommands/command/$command/passcode/$passcode/id/$id -H "Authorization: Bearer $token"
 	done
 	
 else
