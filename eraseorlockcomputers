@@ -99,6 +99,14 @@ computerid+=($(curl -ksu $user:$pass -X GET $jurl/JSSResource/computergroups/id/
 
 echo ${computerid[@]}
 
+if [[ -z ${computerid[@]} ]]; then
+	osascript << EOF
+set theDialogText to "There was an issue with your API Credentials or Group ID. Please try again."
+	display dialog theDialogText buttons {"OK"} default button "OK"
+EOF
+	exit 0
+fi
+
 numberofcomputers=0
 for id in ${computerid[@]}; do
 	((numberofcomputers++))
@@ -106,6 +114,7 @@ done
 
 echo $numberofcomputers
 
+#passcode prompt
 if [[  -z $passcode ]]; then
 	
 	passcode=$(osascript << EOF
@@ -113,13 +122,29 @@ set passcode to display dialog "To continue to $commandprompt $numberofcomputers
 text returned of passcode
 EOF
 )
-	
 fi
 
-# Prompt for the passcode
+#passcode verification
+passcodeverify=0
+while [[ $passcodeverify == 0 ]]; do
+if [[ $passcode =~ ^[0-9]{6} ]]; then
+		echo "passcode is clean"
+		((passcodeverify++))
+	else
+		passcode=$(osascript << EOF
+set passcode to display dialog "Your passcode is invalid. Please enter a six-digit numeric code. You need to set a passcode that is six digits and only numbers. (ex. 123456)" default answer "" buttons {"Continue"} default button "Continue" with hidden answer
+text returned of passcode
+EOF
+)
+	fi
+done
+	
+
+
+# Gives user time to know what passcode they just set
 osascript << EOF
 set theDialogText to "Please record the passcode for your records. Your passcode is $passcode"
-display dialog theDialogText buttons {"Don't Continue", "Continue"} default button "Continue" cancel button "Don't Continue"
+display dialog theDialogText buttons {"OK"} default button "OK"
 EOF
 
 #Warning for Number of computers that are going to be Erase / Locked
