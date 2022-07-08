@@ -1,0 +1,144 @@
+#!/bin/bash
+
+
+###############################################
+# Send an Erase / Device Lock Command to a Group of Computers
+#
+# For this to work, you just need a group ID. 
+#
+# Fill in the variables below, this will only prompt for a group ID if one is not present
+#
+# Script by Chris Zimmerman 
+# Built on July 7th, 2022
+#
+#
+# API ACCOUNT PRIVILEGE REQUIREMENTS (MINIMUM)
+#
+# JAMF PRO SERVER OBJECTS
+# Computers > CREATE
+# Smart Computer Groups > READ
+# Static Computer Groups > READ
+#
+# JAMF PRO SERVER SETTINGS
+# Check-in > READ (will also enable computer check-in setting)
+#
+# JAMF PRO SERVER ACTIONS
+# Computer Remote Lock Command
+# Computer Remote Wipe Command 
+#
+# If using this script, you are agreeing to using it as is
+###############################################
+
+#API USER
+user=""
+#API PASSWORD
+pass=""
+# URL (https://yourjamfserver.jamfcloud.com)
+jurl=""
+#GROUP ID
+groupid=""
+#PASSCODE (Six Digits Numbers Only) -- This is necessary for the command, but when erasing devices this may be ignored in Monterey
+passcode=""
+# Delete Modifier (In order to Erase Computers, you will need to change this value to 1)
+eraseorlock="0"
+
+#If No Group ID exists, this will prompt the user for the Group ID
+
+if [[  -z $jurl ]]; then
+	
+	jurl=$(osascript << EOF
+set jurl to display dialog "Jamf Pro Server URL (https://yourjamf.jamfcloud.com):" default answer "" buttons {"Continue"} default button "Continue"
+text returned of jurl
+EOF
+)
+	
+fi
+
+if [[  -z $user ]]; then
+	
+	user=$(osascript << EOF
+set user to display dialog "Enter API Username:" default answer "" buttons {"Continue"} default button "Continue"
+text returned of user
+EOF
+)
+	
+fi
+
+if [[  -z $pass ]]; then
+	
+	pass=$(osascript << EOF
+set pass to display dialog "Enter API password:" default answer "" buttons {"Continue"} default button "Continue" with hidden answer
+text returned of pass
+EOF
+)
+	
+fi
+
+
+if [[  -z $groupid ]]; then
+	
+	groupid=$(osascript << EOF
+set groupid to display dialog "Enter the Group ID:" default answer "" buttons {"Continue"} default button "Continue"
+text returned of groupid
+EOF
+)
+	
+fi
+
+#Setting the command
+if [[ $eraseorlock == "1" ]]; then
+	commandprompt="ERASE"
+	command="EraseDevice"
+else
+	commandprompt="LOCK"
+	command="DeviceLock"
+fi
+
+#Parse Through Group to get computer IDs
+computerid+=($(curl -ksu $user:$pass -X GET $jurl/JSSResource/computergroups/id/$groupid | xmllint --format - | awk -F '[<>]' '/<id>/{print $3}'| awk 'NR>2'))
+
+echo ${computerid[@]}
+
+numberofcomputers=0
+for id in ${computerid[@]}; do
+	((numberofcomputers++))
+done
+
+echo $numberofcomputers
+
+if [[  -z $passcode ]]; then
+	
+	passcode=$(osascript << EOF
+set passcode to display dialog "To continue to $commandprompt $numberofcomputers computers. You need to set a passcode that is six digits and only numbers. (ex. 123456)" default answer "" buttons {"Continue"} default button "Continue" with hidden answer
+text returned of passcode
+EOF
+)
+	
+fi
+
+# Prompt for the passcode
+osascript << EOF
+set theDialogText to "Please record the passcode for your records. Your passcode is $passcode"
+display dialog theDialogText buttons {"Don't Continue", "Continue"} default button "Continue" cancel button "Don't Continue"
+EOF
+
+#Warning for Number of computers that are going to be Erase / Locked
+finalwarning=$(osascript << EOF
+set theDialogText to "You are about to $commandprompt $numberofcomputers computers. Do you wish to continue?"
+display dialog theDialogText buttons {"Don't Continue", "Continue"} default button "Continue" cancel button "Don't Continue"
+EOF
+)
+
+if [[ $finalwarning == "button returned:"Continue"" ]]; then
+	
+	#Erase or Lock Device Command	
+	for id in ${computerid[@]}; do
+		curl -ksu $user:$pass -X POST $jurl/JSSResource/computercommands/command/$command/passcode/$passcode/id/$id
+	done
+	
+else
+	osascript << EOF
+set theDialogText to "Action Cancelled"
+display dialog theDialogText buttons {"OK"} default button "OK"
+EOF
+fi
