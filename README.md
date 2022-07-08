@@ -63,7 +63,7 @@ This script will run for ALL Entries in your CSV file. So if you don't want to d
 
 This is a script I made that has a ton of prompts on it. The goal is to help do a mass action for Remote Wipe and Device Lock commands. So please use at your own risk. 
 
-This is pretty straight forward. The script will default to only device lock unless the varible for '''eraseorlock''' is set to '''1'''. 
+This is pretty straight forward. The script will default to only device lock unless the varible for ```eraseorlock``` is set to ```1```. 
 
 The prompts are there if you aren't comfortable leaving your credentials in the script. 
 
