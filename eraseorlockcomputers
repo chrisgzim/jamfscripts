@@ -42,7 +42,7 @@ passcode=""
 # Delete Modifier (In order to Erase Computers, you will need to change this value to 1)
 eraseorlock="0"
 
-#If No Group ID exists, this will prompt the user for the Group ID
+#Prompt for URL for Jamf Pro Server (https://yourjamfproserver.jamfcloud.com)
 
 if [[  -z $jurl ]]; then
 	
@@ -54,6 +54,7 @@ EOF
 	
 fi
 
+#Prompt for API Username
 if [[  -z $user ]]; then
 	
 	user=$(osascript << EOF
@@ -64,6 +65,7 @@ EOF
 	
 fi
 
+#Prompt for API Password
 if [[  -z $pass ]]; then
 	
 	pass=$(osascript << EOF
@@ -74,7 +76,7 @@ EOF
 	
 fi
 
-
+#Prompt for Group ID
 if [[  -z $groupid ]]; then
 	
 	groupid=$(osascript << EOF
